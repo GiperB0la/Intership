@@ -4,12 +4,11 @@
 #include <thread>
 #include <mutex>
 #include <string>
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
 #include <unistd.h>
-
-#include "ClientSocket.h"
+#include <algorithm>
 
 
 class Socket
@@ -24,17 +23,19 @@ public:
 private:
     void work();
     void init();
-    void handleClient(ClientSocket client);
-    void connecting();
-    void clientDisconnected(ClientSocket client);
+    void handleClient(int clientSocket);
+    void listening();
+    void clientDisconnected(int clientSocket);
 
 private:
-    int serverSocket;
-    std::string ipAddress;
-    std::string message;
-    int port;
     sockaddr_in info;
-    int infoLength;
-    std::mutex clientMutex;
-    std::vector<ClientSocket> clients;
+    int serverSocket;
+
+private:
+    int port;
+    std::string ipAddress;
+    std::mutex mx;
+
+private:
+    std::vector<int> clients;
 };

@@ -1,37 +1,47 @@
-#include "../include/Client.h"
+#include "Client.h"
 
-Client::Client() : connectSocket(-1), connectFlag(false) {}
+
+Client::Client() : clientSocket(-1), ipAddress("127.0.0.1"), port(5555), connectFlag(false)
+{}
 
 Client::~Client()
 {
-    if (connectSocket != -1) {
-        close(connectSocket);
+    if (clientSocket != -1) {
+        close(clientSocket);
     }
+}
+
+void Client::init()
+{
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket < 0) {
+        perror("[-] Error creating socket");
+        return;
+    }
+
+    info.sin_family = AF_INET;
+    info.sin_port = htons(port);
+
+    if (inet_pton(AF_INET, ipAddress.c_str(), &info.sin_addr) <= 0) {
+        perror("[-] Invalid address");
+        close(clientSocket);
+        return;
+    }
+
+    if (connect(clientSocket, (sockaddr*)&info, sizeof(info)) < 0) {
+        perror("[-] Connection failed");
+        close(clientSocket);
+        return;
+    }
+
+    connectFlag = true;
+    std::cout << "[+] Connected to server." << std::endl;
 }
 
 bool Client::Connection()
 {
-    connectSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (connectSocket == -1) {
-        std::cerr << "[-] Error creating socket: " << strerror(errno) << std::endl;
-        return false;
-    }
-
-    sockaddr_in serverAddress;
-    serverAddress.sin_family = AF_INET;
-    inet_pton(AF_INET, "127.0.0.1", &serverAddress.sin_addr);
-    serverAddress.sin_port = htons(5555);
-
-    int connectionResult = connect(connectSocket, (sockaddr*)&serverAddress, sizeof(serverAddress));
-    if (connectionResult == -1) {
-        std::cerr << "[-] Unable to connect to server: " << strerror(errno) << std::endl;
-        close(connectSocket);
-        return false;
-    }
-
-    std::cout << "[+] Connected to server." << std::endl;
-    connectFlag = true;
-    return true;
+    init();
+    return connectFlag;
 }
 
 void Client::ProcessingData()
@@ -39,32 +49,30 @@ void Client::ProcessingData()
     while (connectFlag) {
         char buffer[1024];
         memset(buffer, 0, sizeof(buffer));
-        int recvLength = recv(connectSocket, buffer, sizeof(buffer), 0);
-        if (recvLength > 0) {
-            message = buffer;
-            std::cout << std::endl << "Received: " << message << std::endl;
+        int recvLength = recv(clientSocket, buffer, sizeof(buffer), 0);
 
-            if (CorrectData()) {
+        if (recvLength > 0) {
+            std::string message(buffer, recvLength);
+            std::cout << "Received: " << message << std::endl;
+
+            if (correctData(message)) {
                 std::cout << "Data is correct." << std::endl;
-            }
-            else {
+            } else {
                 std::cout << "Data is incorrect." << std::endl;
             }
-        }
-        else if (recvLength == 0) {
+        } else if (recvLength == 0) {
             connectFlag = false;
             std::cout << "[-] Server closed connection." << std::endl;
-        }
-        else {
+        } else {
+            perror("[-] Receive failed");
             connectFlag = false;
-            std::cerr << "[-] Receive failed with error: " << strerror(errno) << std::endl;
         }
     }
 
-    close(connectSocket);
+    close(clientSocket);
 }
 
-bool Client::CorrectData()
+bool Client::correctData(const std::string& message)
 {
     if ((message.size() > 2) && (std::stoi(message) % 32 == 0))
         return true;

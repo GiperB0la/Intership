@@ -1,13 +1,12 @@
 #pragma once
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <unistd.h>
 #include <iostream>
 #include <string>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <cstring>
-#include <chrono>
-#include <thread>
+
 
 class Client
 {
@@ -20,10 +19,17 @@ public:
     void ProcessingData();
 
 private:
-    bool CorrectData();
+    void init();
+    bool correctData(const std::string& message);
+
+private:
+    sockaddr_in info;
+    int clientSocket;
+
+private:
+    int port;
+    std::string ipAddress;
 
 private:
     bool connectFlag;
-    int connectSocket;
-    std::string message;
 };

@@ -1,47 +1,51 @@
 #include "../include/Socket.h"
 
 
-Socket::Socket() : port(5555), ipAddress("127.0.0.1"),
-serverSocket(-1), info{ 0 }, infoLength(sizeof(info)) 
+Socket::Socket() : port(5555), ipAddress("127.0.0.1"), serverSocket(-1), info{ 0 } 
 {
     work();
 }
 
-Socket::~Socket()
+Socket::~Socket() 
 {
-    close(serverSocket);
+    if (serverSocket != -1) {
+        close(serverSocket);
+    }
 }
 
-void Socket::init()
+void Socket::init() 
 {
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        perror("[-] Error creating socket");
+        return;
+    }
+
     info.sin_family = AF_INET;
     info.sin_port = htons(port);
     info.sin_addr.s_addr = inet_addr(ipAddress.c_str());
 
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket < 0) {
-        std::cout << std::endl << "[-] Error creating socket: " << errno << std::endl;
+    if (bind(serverSocket, (sockaddr*)&info, sizeof(info)) < 0) {
+        perror("[-] Error bind socket");
+        close(serverSocket);
         return;
     }
 
-    int bindResult = bind(serverSocket, (sockaddr*)&info, infoLength);
-    if (bindResult < 0) {
-        std::cout << std::endl << "[-] Error bind socket: " << errno << std::endl;
-        return;
-    }
+    std::cout << "[+] The server is running." << std::endl;
 }
 
-void Socket::work()
+void Socket::work() 
 {
     init();
-    std::thread connectingThread(&Socket::connecting, this);
-    connectingThread.detach();
+
+    std::thread listeningThread(&Socket::listening, this);
+    listeningThread.detach();
 }
 
-void Socket::connecting()
+void Socket::listening() 
 {
     if (listen(serverSocket, SOMAXCONN) < 0) {
-        std::cout << std::endl << "[-] Error listen: " << errno << std::endl;
+        perror("[-] Error listen");
         close(serverSocket);
         return;
     }
@@ -50,58 +54,55 @@ void Socket::connecting()
         sockaddr_in clientInfo;
         socklen_t clientInfoLength = sizeof(clientInfo);
         int clientSocket = accept(serverSocket, (sockaddr*)&clientInfo, &clientInfoLength);
+
         if (clientSocket < 0) {
-            std::cout << "[-] Accept failed: " << errno << std::endl;
+            perror("[-] Accept failed");
             continue;
         }
-        ClientSocket client(clientSocket, clientInfo, clientInfoLength);
-        std::cout << "[+] Client connected from: " << inet_ntoa(client.clientInfo.sin_addr) << ":" << ntohs(client.clientInfo.sin_port) << std::endl << "Input: ";
 
-        clients.push_back(client);
-        std::thread(&Socket::handleClient, this, client).detach();
+        clients.push_back(clientSocket);
+        std::cout << std::endl << "[+] Client connected from: " << inet_ntoa(clientInfo.sin_addr) << ":" << ntohs(clientInfo.sin_port) << std::endl << "Input: ";
+        std::thread(&Socket::handleClient, this, clientSocket).detach();
     }
 }
 
-void Socket::handleClient(ClientSocket client)
+void Socket::handleClient(int clientSocket) 
 {
     char buffer[512];
     while (true) {
-        int recvLength = recv(client.clientSocket, buffer, sizeof(buffer), 0);
-        if (recvLength == 0) {
-            std::cout << "[-] Client disconnected." << std::endl;
-            close(client.clientSocket);
-            clientDisconnected(client);
+        int recvLength = recv(clientSocket, buffer, sizeof(buffer), 0);
+
+        if (recvLength <= 0) {
+            if (recvLength == 0) {
+                std::cerr << std::endl << "[-] Client disconnected." << std::endl;
+            } else {
+                perror("[-] Error receiving data");
+            }
+            clientDisconnected(clientSocket);
             break;
         }
-        else if (recvLength < 0) {
-            std::cout << "[-] Error receiving data: " << errno << std::endl;
-            close(client.clientSocket);
-            clientDisconnected(client);
-            break;
-        }
-    }
 
-    std::lock_guard<std::mutex> lock(clientMutex);
-    clientDisconnected(client);
-}
-
-void Socket::clientDisconnected(ClientSocket client)
-{
-    for (size_t i = 0; i < clients.size(); i++) {
-        if (clients[i].clientSocket == client.clientSocket) {
-            std::cout << "Client " << i + 1 << " {" << inet_ntoa(client.clientInfo.sin_addr) << ":" << ntohs(client.clientInfo.sin_port) << "} disconnected." << std::endl << "Input: ";
-            clients.erase(clients.begin() + i);
-        }
+        std::cout << "Received data: " << std::string(buffer, recvLength) << std::endl;
     }
 }
 
-void Socket::sendData(const std::string& data)
+void Socket::sendData(const std::string& data) 
 {
-    std::lock_guard<std::mutex> lock(clientMutex);
-    for (ClientSocket client : clients) {
-        int sendResult = send(client.clientSocket, data.c_str(), data.size(), 0);
+    std::lock_guard<std::mutex> lock(mx);
+
+    for (int client : clients) {
+        int sendResult = send(client, data.c_str(), data.size(), 0);
         if (sendResult < 0) {
-            std::cout << "[-] Failed to send data to client: " << errno << std::endl;
+            perror("[-] Failed to send data to client");
         }
     }
+}
+
+void Socket::clientDisconnected(int clientSocket) 
+{
+    std::lock_guard<std::mutex> lock(mx);
+
+    clients.erase(std::remove(clients.begin(), clients.end(), clientSocket), clients.end());
+    std::cout << "[+] Client disconnected, socket closed." << std::endl << "Input: ";
+    close(clientSocket);
 }

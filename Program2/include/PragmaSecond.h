@@ -1,5 +1,6 @@
 #pragma once
 #include "Client.h"
+#include <thread>
 
 
 class PragmaSecond
