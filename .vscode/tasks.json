@@ -1,0 +1,58 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "build-Program1",
+            "command": "/usr/bin/g++",
+            "args": [
+                "-g",
+                "-pthread",
+                "${workspaceFolder}/Program1/src/Main.cpp",
+                "${workspaceFolder}/Program1/src/PragmaFirst.cpp",
+                "${workspaceFolder}/Program1/src/Socket.cpp",
+                "${workspaceFolder}/Program1/src/ThreadFirst.cpp",
+                "${workspaceFolder}/Program1/src/ThreadSecond.cpp",
+                "${workspaceFolder}/Program1/src/WorkingWithString.cpp",
+                "-o",
+                "${workspaceFolder}/Program1/build/Program1"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Задача создана отладчиком."
+        },
+        {
+            "type": "cppbuild",
+            "label": "build-Program2",
+            "command": "/usr/bin/g++",
+            "args": [
+                "-g",
+                "-pthread",
+                "${workspaceFolder}/Program2/src/Main.cpp",
+                "${workspaceFolder}/Program2/src/Client.cpp",
+                "${workspaceFolder}/Program2/src/PragmaSecond.cpp",
+                "-o",
+                "${workspaceFolder}/Program2/build/Program2"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Задача создана отладчиком."
+        }
+    ],
+    "version": "2.0.0"
+}
